@@ -1,0 +1,35 @@
+{
+  "name": "ygocdb-mcp-server",
+  "version": "1.0.0",
+  "description": "用于与百鸽(ygocdb.com)API交互的MCP服务端",
+  "license": "MIT",
+  "author": "lieyanqzu",
+  "homepage": "https://github.com/lieyanqzu/ygocdb-mcp",
+  "bugs": "https://github.com/lieyanqzu/ygocdb-mcp/issues",
+  "type": "module",
+  "bin": {
+    "ygocdb-mcp-server": "dist/index.js"
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsc && shx chmod +x dist/*.js",
+    "prepare": "npm run build",
+    "watch": "tsc --watch",
+    "dev": "NODE_NO_WARNINGS=1 tsx watch index.ts"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.10.1",
+    "node-fetch": "^3.3.1",
+    "yargs": "^17.7.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/node-fetch": "^2.6.2",
+    "@types/yargs": "^17.0.32",
+    "shx": "^0.3.4",
+    "typescript": "^5.6.2",
+    "tsx": "^4.7.0"
+  }
+}
