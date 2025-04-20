@@ -6,10 +6,6 @@
 
 [![smithery badge](https://smithery.ai/badge/@lieyanqzu/ygocdb-mcp)](https://smithery.ai/server/@lieyanqzu/ygocdb-mcp)
 
-<a href="https://glama.ai/mcp/servers/@lieyanqzu/ygocdb-mcp">
-  <img width="380" height="200" src="https://glama.ai/mcp/servers/@lieyanqzu/ygocdb-mcp/badge" />
-</a>
-
 ## API 文档
 
 本服务端基于游戏王卡牌数据库的公开 API。
