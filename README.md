@@ -2,7 +2,7 @@
 
 [English](README/README.en.md) | 中文
 
-一个基于 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 的服务端，用于与 [百鸽(ygocdb.com)](https://ygocdb.com/) API 交互。提供了一系列工具来查询游戏王中文卡牌信息。
+一个基于 [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) 的服务端，用于与 [百鸽(ygocdb.com)](https://ygocdb.com/)等 API 交互。提供了一系列工具来查询游戏王中文卡牌信息。
 
 [![smithery badge](https://smithery.ai/badge/@lieyanqzu/ygocdb-mcp)](https://smithery.ai/server/@lieyanqzu/ygocdb-mcp)
 
