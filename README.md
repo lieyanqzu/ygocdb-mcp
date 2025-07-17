@@ -1,3 +1,5 @@
+[![MseeP.ai Security Assessment Badge](https://mseep.net/pr/lieyanqzu-ygocdb-mcp-badge.png)](https://mseep.ai/app/lieyanqzu-ygocdb-mcp)
+
 # 百鸽(ygocdb.com) MCP Server
 
 [English](README/README.en.md) | 中文
