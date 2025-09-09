@@ -1,13 +1,23 @@
 # Smithery configuration file: https://smithery.ai/docs/config#smitheryyaml
 
+runtime: "container"
+build:
+  dockerfile: "Dockerfile"           # Dockerfile路径
+  dockerBuildPath: "."               # Docker构建上下文
 startCommand:
-  type: stdio
-  configSchema:
-    # JSON Schema defining the configuration options for the MCP.
+  type: "http"
+  # configSchema和exampleConfig是可选的 - 如果不需要配置可以移除
+  configSchema:                      # 可选：定义配置模式
     type: object
-    required: []
-    properties: {}
-  commandFunction:
-    # A function that produces the CLI command to start the MCP on stdio.
-    |-
-    (config) => ({command:'node', args:['/app/dist/index.js']})
+    properties:
+      apiUrl:
+        type: string
+        description: YGOCDB API基础URL
+        default: "https://www.ygocdb.com/api"
+      timeout:
+        type: number
+        description: 请求超时时间（毫秒）
+        default: 10000
+  exampleConfig:                     # 可选：示例配置
+    apiUrl: "https://www.ygocdb.com/api"
+    timeout: 10000

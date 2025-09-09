@@ -34,56 +34,61 @@
 
 ## 使用方法
 
-服务端支持两种运行模式：
-
-1. 标准 stdio 模式（默认）
-2. 无状态 Streamable HTTP 模式，提供 HTTP 端点
-
-### 使用 NPX
-
-如果你本地安装了 Node.js：
+### 通过 NPM 包使用
 
 ```bash
-# Stdio 模式
+# 全局安装
+npm install -g ygocdb-mcp-server
+
+# 或直接运行（推荐）
 npx ygocdb-mcp-server
-
-# Streamable HTTP 模式
-npx ygocdb-mcp-server --http
 ```
 
-### 连接到服务端
+### 本地开发
 
-#### Stdio 模式
+```bash
+# 克隆项目
+git clone <repository-url>
+cd ygocdb-mcp
 
-你的应用程序或环境（如 Claude Desktop）可以通过 stdio 直接与服务端通信。
+# 安装依赖
+npm install
 
-#### Streamable HTTP 模式
+# 构建项目
+npm run build
 
-当使用 Streamable HTTP 模式运行时（使用 `--http` 参数）：
+# 运行 STDIO 模式
+npm run start:stdio
 
-服务端将在以下端点可用：
-
-- Streamable HTTP 端点：`http://localhost:3000/mcp`
-
-该模式为无状态模式，不维护会话信息，提供更简化和高效的通信方式。
-
-### 在 claude_desktop_config.json 中集成
-
-stdio 模式的示例配置：
-
-```json
-{
-  "mcpServers": {
-    "ygocdb": {
-      "command": "docker",
-      "args": ["run", "-i", "--rm", "mcp/ygocdb"]
-    }
-  }
-}
+# 运行 HTTP 模式
+npm run start:http
 ```
 
-或使用 npx：
+### 运行模式
 
+服务端支持两种运行模式：
+
+#### STDIO 模式（默认）
+用于与 Claude Desktop 等 MCP 客户端直接集成：
+
+```bash
+npm run start:stdio
+```
+
+#### HTTP 模式
+用于容器部署或 HTTP 客户端访问：
+
+```bash
+npm run start:http
+```
+
+HTTP 服务器将在端口 8081 上启动，端点为 `http://localhost:8081/mcp`
+
+### 在 Claude Desktop 中集成
+
+在 `claude_desktop_config.json` 中添加配置：
+
+#### 使用 NPX（推荐）
 ```json
 {
   "mcpServers": {
@@ -95,20 +100,36 @@ stdio 模式的示例配置：
 }
 ```
 
-### 使用 Docker 构建
-
-```bash
-docker build -t mcp/ygocdb .
+#### 使用本地构建
+```json
+{
+  "mcpServers": {
+    "ygocdb": {
+      "command": "node",
+      "args": ["path/to/ygocdb-mcp/dist/index.js"],
+      "cwd": "path/to/ygocdb-mcp"
+    }
+  }
+}
 ```
 
-然后你可以在 stdio 模式下运行：
+### Docker 部署
 
 ```bash
-docker run -i --rm mcp/ygocdb
+# 构建镜像
+docker build -t ygocdb-mcp .
+
+# 运行 STDIO 模式（用于集成）
+docker run -i --rm ygocdb-mcp
+
+# 运行 HTTP 模式（用于服务）
+docker run -p 8081:8081 ygocdb-mcp
 ```
 
-或在 Streamable HTTP 模式下运行：
+### 跨平台支持
 
-```bash
-docker run -i --rm -p 3000:3000 mcp/ygocdb --http
-```
+项目使用 `cross-env` 确保在所有平台上正确设置环境变量：
+
+- **Windows**: `npm run start:http` 或 `npm run start:stdio`
+- **macOS/Linux**: `npm run start:http` 或 `npm run start:stdio`
+- **Docker**: 自动使用 HTTP 模式

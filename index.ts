@@ -1,5 +1,7 @@
 #!/usr/bin/env node
 
+import express, { Request, Response } from "express";
+import cors from "cors";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
@@ -9,12 +11,8 @@ import {
   Tool,
   JSONRPCError
 } from "@modelcontextprotocol/sdk/types.js";
-import fetch, { Response } from "node-fetch";
-import yargs from "yargs";
-import { hideBin } from "yargs/helpers";
-import { createServer, IncomingMessage, ServerResponse } from "node:http";
-import { parse } from "node:url";
-import { randomUUID } from "node:crypto";
+import fetch, { Response as FetchResponse } from "node-fetch";
+import { z } from "zod";
 
 /**
  * YGOCDB API 参考:
@@ -29,12 +27,45 @@ import { randomUUID } from "node:crypto";
  * 3) get_card_image - 通过卡牌ID获取卡牌图片
  */
 
+// Express应用和端口配置
+const app = express();
+const PORT = process.env.PORT || 8081;
+
+// CORS配置，适用于基于浏览器的MCP客户端
+app.use(cors({
+  origin: '*', // 生产环境中请适当配置
+  exposedHeaders: ['Mcp-Session-Id', 'mcp-protocol-version'],
+  allowedHeaders: ['Content-Type', 'mcp-session-id'],
+}));
+
+app.use(express.json());
+
 // 定义基础URL
 const BASE_URL = "https://ygocdb.com/api/v0";
 
 // 错误响应格式
 interface YgocdbError {
   message: string;
+}
+
+// 配置模式（可选 - 如果不需要配置可以跳过）
+export const configSchema = z.object({
+  // 目前YGOCDB API不需要特殊配置，但保留扩展性
+  apiUrl: z.string().optional().default(BASE_URL).describe("YGOCDB API基础URL"),
+  timeout: z.number().optional().default(10000).describe("请求超时时间（毫秒）"),
+});
+
+// 从查询参数解析配置
+function parseConfig(req: Request) {
+  const configParam = req.query.config as string;
+  if (configParam) {
+    try {
+      return JSON.parse(Buffer.from(configParam, 'base64').toString());
+    } catch {
+      return {};
+    }
+  }
+  return {};
 }
 
 // 搜索卡牌工具
@@ -109,7 +140,7 @@ const YGOCDB_TOOLS = [
 ] as const;
 
 // 处理响应的通用函数
-async function handleYgocdbResponse(response: Response) {
+async function handleYgocdbResponse(response: FetchResponse) {
   if (!response.ok) {
     // 尝试解析错误
     let errorObj: YgocdbError | null = null;
@@ -156,21 +187,21 @@ async function handleYgocdbResponse(response: Response) {
 }
 
 // 搜索卡牌处理函数
-async function handleSearchCards(query: string) {
-  const url = `${BASE_URL}/?search=${encodeURIComponent(query)}`;
+async function handleSearchCards(query: string, config?: z.infer<typeof configSchema>) {
+  const url = `${config?.apiUrl || BASE_URL}/?search=${encodeURIComponent(query)}`;
   const response = await fetch(url);
   return handleYgocdbResponse(response);
 }
 
 // 通过ID获取卡牌处理函数
-async function handleGetCardById(id: string) {
-  const url = `${BASE_URL}/?search=${encodeURIComponent(id)}`;
+async function handleGetCardById(id: string, config?: z.infer<typeof configSchema>) {
+  const url = `${config?.apiUrl || BASE_URL}/?search=${encodeURIComponent(id)}`;
   const response = await fetch(url);
   return handleYgocdbResponse(response);
 }
 
 // 通过ID获取卡牌图片处理函数
-async function handleGetCardImage(id: string) {
+async function handleGetCardImage(id: string, config?: z.infer<typeof configSchema>) {
   const url = `https://cdn.233.momobako.com/ygopro/pics/${encodeURIComponent(id)}.jpg`;
   
   try {
@@ -223,12 +254,16 @@ async function handleGetCardImage(id: string) {
   }
 }
 
-// 创建服务端实例
-function createYgocdbServer() {
-  const newServer = new Server(
+// 创建MCP服务器和注册工具
+export default function createServer({
+  config,
+}: {
+  config: z.infer<typeof configSchema>;
+}) {
+  const server = new Server(
     {
       name: "mcp-server/ygocdb",
-      version: "1.0.0"
+      version: "1.1.0"
     },
     {
       capabilities: {
@@ -238,26 +273,26 @@ function createYgocdbServer() {
   );
 
   // 设置工具列表处理器
-  newServer.setRequestHandler(ListToolsRequestSchema, async () => ({
+  server.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: YGOCDB_TOOLS
   }));
 
   // 设置工具调用处理器
-  newServer.setRequestHandler(CallToolRequestSchema, async (request) => {
+  server.setRequestHandler(CallToolRequestSchema, async (request) => {
     try {
       const { name, arguments: args } = request.params;
       switch (name) {
         case "search_cards": {
           const { query } = args as { query: string };
-          return await handleSearchCards(query);
+          return await handleSearchCards(query, config);
         }
         case "get_card_by_id": {
           const { id } = args as { id: string };
-          return await handleGetCardById(id);
+          return await handleGetCardById(id, config);
         }
         case "get_card_image": {
           const { id } = args as { id: string };
-          return await handleGetCardImage(id);
+          return await handleGetCardImage(id, config);
         }
         default:
           return {
@@ -283,116 +318,74 @@ function createYgocdbServer() {
     }
   });
 
-  return newServer;
+  return server;
 }
 
-// 创建错误响应
-function createErrorResponse(message: string): JSONRPCError {
-  return {
-    jsonrpc: '2.0',
-    error: {
-      code: -32000,
-      message: message,
-    },
-    id: randomUUID(),
-  };
-}
+// 处理MCP请求的端点
+app.all('/mcp', async (req: Request, res: Response) => {
+  try {
+    // 解析配置（可选）
+    const rawConfig = parseConfig(req);
 
-// 启动服务端
-async function runServer() {
-  const argv = await yargs(hideBin(process.argv))
-    .option("http", {
-      type: "boolean",
-      description: "使用 Streamable HTTP 传输而不是 stdio",
-      default: false
-    })
-    .option("port", {
-      type: "number",
-      description: "HTTP 传输使用的端口",
-      default: 3000
-    })
-    .help().argv;
-
-  if (argv.http) {
-    // 创建一个全局的无状态Server实例
-    const ygocdbServer = createYgocdbServer();
-    const transport = new StreamableHTTPServerTransport({
-      sessionIdGenerator: undefined, // 设置为undefined表示无状态模式
+    // 验证和解析配置
+    const config = configSchema.parse({
+      apiUrl: rawConfig.apiUrl || process.env.YGOCDB_API_URL || BASE_URL,
+      timeout: rawConfig.timeout || parseInt(process.env.YGOCDB_TIMEOUT || "10000"),
     });
-    
-    // 连接传输和服务端
-    await ygocdbServer.connect(transport);
-    
-    const httpServer = createServer(
-      async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-        const url = parse(req.url ?? "", true);
 
-        // 统一端点
-        if (url.pathname === "/mcp") {
-          if (req.method === "POST") {
-            // 获取请求体
-            const chunks: Buffer[] = [];
-            for await (const chunk of req) {
-              chunks.push(Buffer.from(chunk));
-            }
-            const body = Buffer.concat(chunks).toString();
-            let jsonBody;
-            
-            try {
-              jsonBody = JSON.parse(body);
-            } catch (e) {
-              res.writeHead(400, { "Content-Type": "application/json" });
-              res.end(JSON.stringify(createErrorResponse("Invalid JSON")));
-              return;
-            }
-            
-            try {
-              // 在无状态模式下，直接处理请求
-              await transport.handleRequest(req, res, jsonBody);
-            } catch (error) {
-              console.error("处理请求时出错:", error);
-              if (!res.headersSent) {
-                res.writeHead(500, { "Content-Type": "application/json" });
-                res.end(JSON.stringify(createErrorResponse("内部服务端错误")));
-              }
-            }
-            return;
-          } else {
-            // 无状态模式不支持GET/DELETE方法，直接返回405
-            res.writeHead(405, {
-              "Content-Type": "application/json",
-              "Allow": "POST"
-            });
-            res.end(JSON.stringify(createErrorResponse("Method Not Allowed")));
-            return;
-          }
-        } else {
-          // 任何其他路径都返回404
-          res.writeHead(404, "Not Found");
-          res.end(JSON.stringify(createErrorResponse("Not Found")));
-          return;
-        }
-      }
-    );
+    const server = createServer({ config });
+    const transport = new StreamableHTTPServerTransport({
+      sessionIdGenerator: undefined,
+    });
 
-    httpServer.listen(argv.port, () => {
-      console.error(
-        `YGOCDB MCP 服务端监听中 http://localhost:${argv.port} (无状态 Streamable HTTP模式)`
-      );
-      console.error(
-        `Streamable HTTP 端点: http://localhost:${argv.port}/mcp`
-      );
+    // 请求关闭时清理
+    res.on('close', () => {
+      transport.close();
+      server.close();
+    });
+
+    await server.connect(transport);
+    await transport.handleRequest(req, res, req.body);
+  } catch (error) {
+    console.error('处理MCP请求时出错:', error);
+    if (!res.headersSent) {
+      res.status(500).json({
+        jsonrpc: '2.0',
+        error: { code: -32603, message: '内部服务器错误' },
+        id: null,
+      });
+    }
+  }
+});
+
+// 主函数以适当模式启动服务器
+async function main() {
+  const transport = process.env.TRANSPORT || 'stdio';
+  
+  if (transport === 'http') {
+    // 在HTTP模式下运行
+    app.listen(PORT, () => {
+      console.log(`YGOCDB MCP HTTP服务器监听端口 ${PORT}`);
     });
   } else {
-    // Standard stdio mode
-    const server = createYgocdbServer();
-    const transport = new StdioServerTransport();
-    await server.connect(transport);
-    console.error("YGOCDB MCP 服务端在 stdio 上运行");
+    // 可选：如果需要向后兼容，添加stdio传输
+    const config = configSchema.parse({
+      apiUrl: process.env.YGOCDB_API_URL || BASE_URL,
+      timeout: parseInt(process.env.YGOCDB_TIMEOUT || "10000"),
+    });
+
+    // 使用配置创建服务器
+    const server = createServer({ config });
+
+    // 开始在stdin上接收消息并在stdout上发送消息
+    const stdioTransport = new StdioServerTransport();
+    await server.connect(stdioTransport);
+    console.error("YGOCDB MCP服务器在stdio模式下运行");
   }
 }
 
-runServer().catch((error) => {
-  console.error("启动 YGOCDB 服务端时发生致命错误:", error);
+// 启动服务器
+main().catch((error) => {
+  console.error("服务器错误:", error);
   process.exit(1);
 });

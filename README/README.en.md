@@ -30,56 +30,61 @@ This server is based on the public API of Baige (ygocdb.com).
 
 ## Usage
 
-The server supports two running modes:
-
-1. Standard stdio mode (default)
-2. Stateless Streamable HTTP mode, providing HTTP endpoints
-
-### Using NPX
-
-If you have Node.js installed locally:
+### Using NPM Package
 
 ```bash
-# Stdio mode
+# Global installation
+npm install -g ygocdb-mcp-server
+
+# Or run directly (recommended)
 npx ygocdb-mcp-server
-
-# Streamable HTTP mode
-npx ygocdb-mcp-server --http
 ```
 
-### Connecting to the Server
+### Local Development
 
-#### Stdio Mode
+```bash
+# Clone the project
+git clone <repository-url>
+cd ygocdb-mcp
 
-Your application or environment (such as Claude Desktop) can communicate directly with the server through stdio.
+# Install dependencies
+npm install
 
-#### Streamable HTTP Mode
+# Build the project
+npm run build
 
-When running in Streamable HTTP mode (using the `--http` parameter):
+# Run STDIO mode
+npm run start:stdio
 
-The server will be available at the following endpoint:
-
-- Streamable HTTP endpoint: `http://localhost:3000/mcp`
-
-This mode operates in a stateless manner, without maintaining session information, providing a simplified and more efficient communication method.
-
-### Integration in claude_desktop_config.json
-
-Example configuration for stdio mode:
-
-```json
-{
-  "mcpServers": {
-    "ygocdb": {
-      "command": "docker",
-      "args": ["run", "-i", "--rm", "mcp/ygocdb"]
-    }
-  }
-}
+# Run HTTP mode
+npm run start:http
 ```
 
-Or using npx:
+### Running Modes
 
+The server supports two running modes:
+
+#### STDIO Mode (Default)
+For direct integration with MCP clients like Claude Desktop:
+
+```bash
+npm run start:stdio
+```
+
+#### HTTP Mode
+For container deployment or HTTP client access:
+
+```bash
+npm run start:http
+```
+
+The HTTP server will start on port 8081 with endpoint `http://localhost:8081/mcp`
+
+### Integration with Claude Desktop
+
+Add configuration to `claude_desktop_config.json`:
+
+#### Using NPX (Recommended)
 ```json
 {
   "mcpServers": {
@@ -91,20 +96,36 @@ Or using npx:
 }
 ```
 
-### Building with Docker
-
-```bash
-docker build -t mcp/ygocdb .
+#### Using Local Build
+```json
+{
+  "mcpServers": {
+    "ygocdb": {
+      "command": "node",
+      "args": ["path/to/ygocdb-mcp/dist/index.js"],
+      "cwd": "path/to/ygocdb-mcp"
+    }
+  }
+}
 ```
 
-Then you can run in stdio mode:
+### Docker Deployment
 
 ```bash
-docker run -i --rm mcp/ygocdb
+# Build image
+docker build -t ygocdb-mcp .
+
+# Run STDIO mode (for integration)
+docker run -i --rm ygocdb-mcp
+
+# Run HTTP mode (for service)
+docker run -p 8081:8081 ygocdb-mcp
 ```
 
-Or in Streamable HTTP mode:
+### Cross-Platform Support
 
-```bash
-docker run -i --rm -p 3000:3000 mcp/ygocdb --http
-``` 
+The project uses `cross-env` to ensure proper environment variable setting across all platforms:
+
+- **Windows**: `npm run start:http` or `npm run start:stdio`
+- **macOS/Linux**: `npm run start:http` or `npm run start:stdio`
+- **Docker**: Automatically uses HTTP mode 
